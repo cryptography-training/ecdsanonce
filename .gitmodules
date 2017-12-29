@@ -1,0 +1,3 @@
+[submodule "pycoin"]
+	path = pycoin
+	url = https://github.com/richardkiss/pycoin
